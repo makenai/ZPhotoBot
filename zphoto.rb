@@ -11,7 +11,7 @@ class ZPhotoBot
   def initialize()
     @config = JSON.load( File.open('config.json') )
     latestPhoto = nil
-    getNewPhotos().each do |photo|
+    getNewPhotos().reverse.each do |photo|
       tweetPhoto( photo )
       if latestPhoto.nil? || photo['dateadded'].to_i > latestPhoto['dateadded'].to_i
         latestPhoto = photo
@@ -35,13 +35,15 @@ class ZPhotoBot
     # Sets the profile image to the given URL (assumed jpg)
     image = RestClient.get( url )
     if image
-      File.open('profile_image.jpg', 'w') do |i|
+      image_filename = "profile_image_#{Time.new.to_i}.jpg"
+      File.open(image_filename, 'w') do |i|
         i.write image
       end
       RestClient.post(
-        "http://#{@config['twitter_user']}:#{@config['twitter_pass']}@twitter.com/account/update_profile_image.json",
-        :image => File.new('profile_image.jpg')  
+        "http://#{@config['twitter_user']}:#{@config['twitter_pass']}@twitter.com/account/update_profile_image.xml",
+        :image => File.new( image_filename )  
       )
+      File.delete( image_filename )
     end
   end
   
