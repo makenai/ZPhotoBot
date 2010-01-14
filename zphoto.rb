@@ -17,7 +17,6 @@ class ZPhotoBot
         latestPhoto = photo
       end
     end
-    return
     if latestPhoto
       setLastPhotoDate( latestPhoto['dateadded'] )
       setProfileImage( latestPhoto['url_sq'] )
