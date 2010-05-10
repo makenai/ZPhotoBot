@@ -29,7 +29,7 @@ class ZPhotoBot
   end
   
   def announce_day!
-    current_day = ( Date.today - Date.parse('2010-01-12') ).to_i
+    current_day = ( Date.today - Date.parse('2010-01-12') ).to_i + 1
     tweet = "Welcome to day #{current_day}!"
     postTweet( tweet )
   end
