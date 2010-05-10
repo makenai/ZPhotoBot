@@ -1,6 +1,8 @@
 require 'rubygems'
 require 'rest_client'
 require 'json'
+require 'date'
+require 'cgi'
 
 # Quick and dirty Flickr->Twitter bridge for Z Photo A Day.
 
@@ -10,6 +12,9 @@ class ZPhotoBot
   
   def initialize()
     @config = JSON.load( File.open('config.json') )
+  end
+  
+  def update!
     latestPhoto = nil
     getNewPhotos().reverse.each do |photo|
       tweetPhoto( photo )
@@ -23,17 +28,28 @@ class ZPhotoBot
     end
   end
   
+  def announce_day!
+    current_day = ( Date.today - Date.parse('2010-01-12') ).to_i
+    tweet = "Welcome to day #{current_day}!"
+    postTweet( tweet )
+  end
+  
   def tweetPhoto( photo )
     # Tweets the photo :)
     url = shortPhotoUrl( photo )
     tweet = "#{url} \"#{photo['title']}\" by #{photo['ownername']}"
+    postTweet( tweet )
+  end
+  
+  def postTweet( tweet )
     RestClient.post "http://#{@config['twitter_user']}:#{@config['twitter_pass']}@twitter.com/statuses/update.json",
-      :status => tweet
+      :status => tweet    
   end
   
   def setProfileImage( url )
     # Sets the profile image to the given URL (assumed jpg)
-    image = RestClient.get( url )
+    response = RestClient.get( url )
+    image = response.is_a?( RestClient::Response ) ? response.body : response
     if image
       image_filename = "profile_image_#{Time.new.to_i}.jpg"
       File.open(image_filename, 'w') do |i|
@@ -49,7 +65,19 @@ class ZPhotoBot
   
   def shortPhotoUrl( photo )
     # Returns the short form of the flickr URL
-    return "http://flic.kr/p/#{base58(photo['id'].to_i)}"
+    longurl = "http://www.flickr.com/photos/#{photo['owner']}/#{photo['id']}/in/pool-#{@config['flickr_group_id']}"
+    shorturl = isgd( longurl )
+    return shorturl ? shorturl : "http://flic.kr/p/#{base58(photo['id'].to_i)}"
+  end
+  
+  def isgd( url )
+    # Use is.gd to shorten a url
+    response = RestClient.get("http://is.gd/api.php?longurl=#{CGI.escape(url)}")
+    if response.code == 200
+      return response.body
+    else
+      return nil
+    end
   end
   
   def base58(n)
@@ -75,7 +103,7 @@ class ZPhotoBot
     #  "url_sq"=>"http://farm3.static.flickr.com/2705/4268495543_bd80cddf16_s.jpg", 
     #  "isfamily"=>0, "server"=>"2705", "id"=>"4268495543", "dateadded"=>"1263309596", 
     #  "secret"=>"bd80cddf16", "ownername"=>"ocx2k4", "isfriend"=>0, "owner"=>"99806344@N00"}
-    json = RestClient.post(
+    response = RestClient.post(
       'http://api.flickr.com/services/rest/',
       :method         => 'flickr.groups.pools.getPhotos',
       :api_key        => @config['flickr_api_key'],
@@ -84,8 +112,9 @@ class ZPhotoBot
       :format         => 'json',
       :nojsoncallback => 1
     )
-    response = JSON.parse( json ) rescue { 'photos' => { 'photo' => [] } }
-    photos = response['photos']['photo']
+    json = response.is_a?( RestClient::Response ) ? response.body : response
+    data = JSON.parse( json ) rescue { 'photos' => { 'photo' => [] } }
+    photos = data['photos']['photo']
     lastDate = getLastPhotoDate()
     return photos.select { |photo| photo['dateadded'].to_i > lastDate }
   end
@@ -105,5 +134,10 @@ class ZPhotoBot
 end
 
 if $0 == __FILE__
-  ZPhotoBot.new()
+  bot = ZPhotoBot.new()
+  if $ARGV[0] == 'announce'
+    bot.announce_day!
+  else
+    bot.update!
+  end
 end
