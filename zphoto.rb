@@ -42,8 +42,9 @@ class ZPhotoBot
   end
   
   def postTweet( tweet )
+    puts "Posting: #{tweet}"
     RestClient.post "http://#{@config['twitter_user']}:#{@config['twitter_pass']}@twitter.com/statuses/update.json",
-      :status => tweet    
+      :status => tweet
   end
   
   def setProfileImage( url )
