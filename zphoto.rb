@@ -63,8 +63,11 @@ class ZPhotoBot
       File.open(image_filename, 'w') do |i|
         i.write image
       end
-      @twitter.update_profile_image( File.new( image_filename ) )
-      File.delete( image_filename )
+      begin
+        @twitter.update_profile_image( File.new( image_filename ) )
+      ensure
+        File.delete( image_filename )
+      end
     end
   end
   
