@@ -1,5 +1,6 @@
 require 'rubygems'
 require 'rest_client'
+require 'twitter'
 require 'json'
 require 'date'
 require 'cgi'
@@ -12,6 +13,13 @@ class ZPhotoBot
   
   def initialize()
     @config = JSON.load( File.open('config.json') )
+    Twitter.configure do |config|
+      config.consumer_key       = @config['twitter_consumer_key']
+      config.consumer_secret    = @config['twitter_consumer_secret']
+      config.oauth_token        = @config['twitter_oauth_token']
+      config.oauth_token_secret = @config['twitter_oauth_secret']
+    end
+    @twitter = Twitter::Client.new
   end
   
   def update!
@@ -29,7 +37,7 @@ class ZPhotoBot
   end
   
   def announce_day!
-    current_day = ( Date.today - Date.parse('2010-01-12') ).to_i + 1
+    current_day = ( Date.today - Date.parse('2011-02-01') ).to_i + 1
     tweet = "Welcome to day #{current_day}!"
     postTweet( tweet )
   end
@@ -43,8 +51,7 @@ class ZPhotoBot
   
   def postTweet( tweet )
     puts "Posting: #{tweet}"
-    RestClient.post "http://#{@config['twitter_user']}:#{@config['twitter_pass']}@twitter.com/statuses/update.json",
-      :status => tweet
+    @twitter.update( tweet )
   end
   
   def setProfileImage( url )
@@ -56,10 +63,7 @@ class ZPhotoBot
       File.open(image_filename, 'w') do |i|
         i.write image
       end
-      RestClient.post(
-        "http://#{@config['twitter_user']}:#{@config['twitter_pass']}@twitter.com/account/update_profile_image.xml",
-        :image => File.new( image_filename )  
-      )
+      @twitter.update_profile_image( File.new( image_filename ) )
       File.delete( image_filename )
     end
   end
@@ -67,15 +71,15 @@ class ZPhotoBot
   def shortPhotoUrl( photo )
     # Returns the short form of the flickr URL
     longurl = "http://www.flickr.com/photos/#{photo['owner']}/#{photo['id']}/in/pool-#{@config['flickr_group_id']}"
-    shorturl = isgd( longurl )
+    shorturl = shorten( longurl )
     return shorturl ? shorturl : "http://flic.kr/p/#{base58(photo['id'].to_i)}"
   end
   
-  def isgd( url )
+  def shorten( url )
     # Use is.gd to shorten a url
-    response = RestClient.get("http://is.gd/api.php?longurl=#{CGI.escape(url)}")
+    response = RestClient.get("http://api.bit.ly/v3/shorten?login=#{@config['bitly_login']}&apiKey=#{@config['bitly_api_key']}&longUrl=#{CGI.escape(url)}&format=txt")
     if response.code == 200
-      return response.body
+      return response.body.chomp
     else
       return nil
     end
